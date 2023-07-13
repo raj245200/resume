@@ -1,1 +1,188 @@
+from google.colab import drive
+drive.mount('/content/drive')
 
+#importing the dataset
+import zipfile
+with zipfile.ZipFile('/content/drive/MyDrive/dataset (2).zip','r') as zip_ref:
+  zip_ref.extractall('/content/')
+
+import os
+import matplotlib.pyplot as plt
+from skimage import io,color,filters,exposure
+from skimage.transform import resize
+import numpy as np
+
+# Set the path to the dataset directory
+dataset_dir = '/content/dataset'
+
+# Define image size
+IMG_SIZE = (256, 256)
+
+# Define a list to store the preprocessed images and labels
+images = []
+labels = []
+
+# Loop over each class in the dataset
+for class_name in os.listdir(dataset_dir):
+    # Ignore any non-directory files
+    if not os.path.isdir(os.path.join(dataset_dir, class_name)):
+        continue
+        
+    # Loop over each image in the class directory
+    for filename in os.listdir(os.path.join(dataset_dir, class_name)):
+        # Load the image
+        image = io.imread(os.path.join(dataset_dir, class_name, filename))
+        
+        # Resize the image to a fixed size
+        image = resize(image, IMG_SIZE)
+        
+        # Apply a Gaussian filter to smooth the image
+        
+        # Append the preprocessed image and its label to the lists
+        images.append(image)
+        if(class_name=="L_FOLDER"):
+            labels.append(0)
+        else:
+            labels.append(1)  
+        
+# Convert the list of images and labels to NumPy arrays
+images = np.array(images)
+labels = np.array(labels)
+np.save('preprocessed_images.npy', images)
+np.save('labels.npy', labels)
+
+import keras
+from keras.models import Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from keras.utils import to_categorical
+from keras.models import Model
+# Define the CNN model architecture
+model = Sequential()
+
+# Add convolutional layers with ReLU activation function
+model.add(Conv2D(64, (3, 3), activation='relu', input_shape=(256, 256, 1)))
+model.add(Conv2D(64, (3, 3), activation='relu'))
+
+# Add pooling layer
+model.add(MaxPooling2D(pool_size=(2, 2)))
+
+# Flatten the feature maps
+model.add(Flatten())
+
+# Add fully connected layers with ReLU activation function
+model.add(Dense(128, activation='relu'))
+model.add(Dense(10, activation='softmax'))
+
+# Compile the model with categorical cross-entropy loss function and Adam optimizer
+model.compile(loss = 'categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+labels_onehot=to_categorical(labels,num_classes=10)   
+# Train the model on the training set
+model.fit(images, labels_onehot, batch_size=32, epochs=5, validation_split=0.1)
+model.save('model.h5')
+
+
+# Load and preprocess a single image for prediction
+import matplotlib.pyplot as plt
+
+image_path = '/content/dataset/L_FOLDER/S2168L17.jpg'  # Replace with the path to your single image
+image = io.imread(image_path)
+image = resize(image, IMG_SIZE)
+
+plt.imshow(image,cmap='gray')
+image = np.array(image)
+image1=image.flatten()
+image = image.reshape((1,) + image.shape)
+
+print(image)
+  # Reshape to a 4D array with shape (1, height, width, channels)
+# Predict the label of the single image
+prediction = model.predict(image)
+prediction=np.array(prediction)
+
+import numpy as np
+
+# Define the feature vector for a single image
+feature_vector = prediction
+feature_vector=feature_vector.flatten()
+print(feature_vector.shape)
+# Determine the number of parity bits needed for the Hamming code
+n = len(feature_vector)
+m = 0
+while 2**m <= n + m + 1:
+    m += 1
+
+# Initialize the encoded vector with zeros
+encoded_vector = np.zeros(n + m)
+
+# Set the data bits in the encoded vector
+j = 0
+for i in range(n + m):
+    if i+1 != 2**m: # <-- fixed: use `m` instead of `j`
+        encoded_vector[i] = feature_vector[j]
+        j += 1
+        if j >= n: # <-- added: check if `j` is within the bounds of `feature_vector`
+            break
+
+# Set the parity bits in the encoded vector
+for i in range(m):
+    p = 2**i
+    ones_count = 0
+    for j in range(1, n + m + 1):
+        if j & p:
+            ones_count += encoded_vector[j-1]
+            if j-1 >= len(encoded_vector): # <-- added: check if `j-1` is within the bounds of `encoded_vector`
+                break
+    encoded_vector[p-1] = ones_count % 2
+
+print("Original feature vector: ", feature_vector)
+print("Encoded feature vector: ", encoded_vector)
+feature_vector=np.array(feature_vector)
+encoded_vector=np.array(encoded_vector)
+print(encoded_vector.shape)
+
+import numpy as np
+
+encoded_vector = np.array(encoded_vector) # replace with your encoded feature vector
+desired_shape = 65536
+
+if encoded_vector.shape[0] < desired_shape:
+    tiled_vector = np.tile(encoded_vector, int(np.ceil(desired_shape / encoded_vector.shape[0])))[:desired_shape]
+else:
+    tiled_vector = encoded_vector[:desired_shape]
+    
+print(tiled_vector.shape)
+print(tiled_vector)
+
+image1=np.array(image1)
+print(image1.shape)
+tiled_vector=np.array(tiled_vector)
+print(tiled_vector.shape)
+
+original_image = bytearray(image1)
+encoded_byte_array = bytearray(tiled_vector)
+print(original_image)
+
+# Convert feature_byte_array and encoded_byte_array to numpy arrays
+original_image = np.array(original_image)
+encoded_array = np.array(encoded_byte_array)
+print(original_image.shape)
+print(encoded_array.shape)
+
+threshold=128
+# Perform XOR operation on the arrays
+xor_result = np.bitwise_xor(original_image, encoded_array)
+#xor_result = np.bitwise_xor(image1, titled_vector)
+print(xor_result)
+#binary_array=np.where(xor_result<threshold,0,1)
+print(xor_result.shape)
+
+# Convert the result back to a byte array
+encrypted_byte_array=np.reshape(xor_result,(512,1024))
+print(encrypted_byte_array.shape)
+
+from PIL import Image
+import matplotlib.pyplot as plt
+# Create a PIL image object from the encrypted byte array
+encrypted_image = Image.fromarray(np.uint8(encrypted_byte_array*255))
+encrypted_image.save('encrypt2.jpg')
+plt.imshow(encrypted_image,cmap='gray')
