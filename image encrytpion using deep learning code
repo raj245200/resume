@@ -187,3 +187,21 @@ import matplotlib.pyplot as plt
 encrypted_image = Image.fromarray(np.uint8(encrypted_byte_array*255))
 encrypted_image.save('encrypt2.jpg')
 plt.imshow(encrypted_image,cmap='gray')
+
+#Image decryption
+
+import matplotlib.pyplot as plt
+from PIL import Image
+decrypted_image=np.bitwise_xor(xor_result,encoded_array)
+
+import numpy as np
+
+# Convert the bytearray back to numpy array
+decrypted_image = np.frombuffer(decrypted_image, dtype=np.float64)
+
+# Reshaping the image
+decrypted_image = np.reshape(decrypted_image, (256,256,))
+decrypted_pil_image = Image.fromarray(np.uint8(decrypted_image * 255))
+decrypted_pil_image.save('decrypt.jpg')
+
+plt.imshow(decrypted_pil_image,cmap='gray')
