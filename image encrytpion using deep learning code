@@ -1,16 +1,16 @@
-#MOUNTING THE DRIVE
 from google.colab import drive
 drive.mount('/content/drive')
 
-#importing the dataset
 import zipfile
 with zipfile.ZipFile('/content/drive/MyDrive/dataset (2).zip','r') as zip_ref:
   zip_ref.extractall('/content/')
 
 import os
+
 import matplotlib.pyplot as plt
 from skimage import io,color,filters,exposure
 from skimage.transform import resize
+
 import numpy as np
 
 # Set the path to the dataset directory
@@ -28,24 +28,26 @@ for class_name in os.listdir(dataset_dir):
     # Ignore any non-directory files
     if not os.path.isdir(os.path.join(dataset_dir, class_name)):
         continue
-        
+
     # Loop over each image in the class directory
     for filename in os.listdir(os.path.join(dataset_dir, class_name)):
         # Load the image
         image = io.imread(os.path.join(dataset_dir, class_name, filename))
-        
+
         # Resize the image to a fixed size
         image = resize(image, IMG_SIZE)
+
         
-        # Apply a Gaussian filter to smooth the image
-        
+
+        #image = np.expand_dims(image, axis=-1)
+
         # Append the preprocessed image and its label to the lists
         images.append(image)
         if(class_name=="L_FOLDER"):
             labels.append(0)
         else:
-            labels.append(1)  
-        
+            labels.append(1)
+
 # Convert the list of images and labels to NumPy arrays
 images = np.array(images)
 labels = np.array(labels)
@@ -72,29 +74,34 @@ model.add(Flatten())
 
 # Add fully connected layers with ReLU activation function
 model.add(Dense(128, activation='relu'))
-model.add(Dense(10, activation='softmax'))
+model.add(Dense(10))
 
 # Compile the model with categorical cross-entropy loss function and Adam optimizer
 model.compile(loss = 'categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-labels_onehot=to_categorical(labels,num_classes=10)   
+labels_onehot=to_categorical(labels,num_classes=10)
 # Train the model on the training set
 model.fit(images, labels_onehot, batch_size=32, epochs=5, validation_split=0.1)
 model.save('model.h5')
 
+y1=model.predict(images)
+
+print(y1/100)
 
 # Load and preprocess a single image for prediction
 import matplotlib.pyplot as plt
+from skimage.color import rgb2gray
 
 image_path = '/content/dataset/L_FOLDER/S2168L17.jpg'  # Replace with the path to your single image
 image = io.imread(image_path)
 image = resize(image, IMG_SIZE)
-
-plt.imshow(image,cmap='gray')
 image = np.array(image)
-image1=image.flatten()
-image = image.reshape((1,) + image.shape)
 
-print(image)
+image1=image.flatten()
+plt.imshow(image,cmap='gray')
+image = image.reshape((1,256,256))
+
+
+print(image.shape)
   # Reshape to a 4D array with shape (1, height, width, channels)
 # Predict the label of the single image
 prediction = model.predict(image)
@@ -140,44 +147,17 @@ print("Encoded feature vector: ", encoded_vector)
 feature_vector=np.array(feature_vector)
 encoded_vector=np.array(encoded_vector)
 print(encoded_vector.shape)
-
-import numpy as np
-
-encoded_vector = np.array(encoded_vector) # replace with your encoded feature vector
-desired_shape = 65536
-
-if encoded_vector.shape[0] < desired_shape:
-    tiled_vector = np.tile(encoded_vector, int(np.ceil(desired_shape / encoded_vector.shape[0])))[:desired_shape]
-else:
-    tiled_vector = encoded_vector[:desired_shape]
-    
-print(tiled_vector.shape)
-print(tiled_vector)
-
 image1=np.array(image1)
-print(image1.shape)
-tiled_vector=np.array(tiled_vector)
-print(tiled_vector.shape)
+expanded_vector=np.array(expanded_vector)
+#result = np.bitwise_xor(image1, expanded_vector)
 
 original_image = bytearray(image1)
-encoded_byte_array = bytearray(tiled_vector)
-print(original_image)
-
-# Convert feature_byte_array and encoded_byte_array to numpy arrays
+encoded_byte_array = bytearray(expanded_vector)
 original_image = np.array(original_image)
+print(original_image)
 encoded_array = np.array(encoded_byte_array)
-print(original_image.shape)
-print(encoded_array.shape)
-
-threshold=128
-# Perform XOR operation on the arrays
 xor_result = np.bitwise_xor(original_image, encoded_array)
-#xor_result = np.bitwise_xor(image1, titled_vector)
-print(xor_result)
-#binary_array=np.where(xor_result<threshold,0,1)
-print(xor_result.shape)
 
-# Convert the result back to a byte array
 encrypted_byte_array=np.reshape(xor_result,(512,1024))
 print(encrypted_byte_array.shape)
 
@@ -205,3 +185,12 @@ decrypted_pil_image = Image.fromarray(np.uint8(decrypted_image * 255))
 decrypted_pil_image.save('decrypt.jpg')
 
 plt.imshow(decrypted_pil_image,cmap='gray')
+encoded_vector=encoded_vector[:10]
+print(encoded_vector.shape)
+
+desired_shape = (65536,)  # Desired shape of the expanded vector
+repeated_vector = np.tile(encoded_vector[:10], int(desired_shape[0] / 10) + 1)
+expanded_vector = repeated_vector[:desired_shape[0]]
+
+print(expanded_vector)
+
